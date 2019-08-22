@@ -1,0 +1,66 @@
+---
+title: "moneyball"
+author: "Jarrod Pelkofer"
+date: "August 21, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#load libraries and data
+```{r}
+library(tidyverse)
+library(janitor)
+
+
+batting <- read_csv("Batting.csv")
+salaries <- read_csv("Salaries.csv")
+
+batting <- batting %>%
+  clean_names()
+
+salaries <- salaries %>%
+  clean_names()
+
+```
+
+###Add columns
+```{r}
+batting <- batting %>%
+  mutate(ba = (h/ab),
+         obp = ((h + bb + hbp)/(ab+bb+hbp+sf)),
+         slg = (((h - x2b - x3b - hr) + (2* x2b) + (3*x3b) + (4*hr))/(ab)))
+
+```
+
+###filter batting data to 1985 and on
+```{r}
+batting <- batting %>%
+  filter(year_id > 1984)
+
+summary(batting)
+
+```
+
+
+###Merge Salary and Batting Data
+```{r}
+batting %>%
+  left_join(select(salaries, everything()), by = c("player_id", "year_id"))
+
+```
+
+###Grab lost players from OAK A's 2001 team
+```{r}
+
+batting %>%
+  filter(player_id %in% c("giambja01", "damonjo01", "saenzol01"), year_id == 2001) %>%
+  select(player_id, h, x2b, x3b, hr, obp, slg, ba, ab)
+
+```
+
+
+
+
