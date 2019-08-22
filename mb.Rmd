@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(janitor)
+library(lpSolve)
 
 
 batting <- read_csv("Batting.csv")
@@ -47,7 +48,7 @@ summary(batting)
 
 ###Merge Salary and Batting Data
 ```{r}
-batting %>%
+batting <- batting %>%
   left_join(select(salaries, everything()), by = c("player_id", "year_id"))
 
 ```
@@ -55,12 +56,61 @@ batting %>%
 ###Grab lost players from OAK A's 2001 team
 ```{r}
 
-batting %>%
+lost_players <- batting %>%
   filter(player_id %in% c("giambja01", "damonjo01", "saenzol01"), year_id == 2001) %>%
   select(player_id, h, x2b, x3b, hr, obp, slg, ba, ab)
 
 ```
 
+###Replacement Players
+
+Find Replacement Players for the key three players we lost! However, you have three constraints:
+
+- The total combined salary of the three players can not exceed 15 million dollars.
+- Their combined number of At Bats (AB) needs to be equal to or greater than the lost players.
+- Their mean OBP had to equal to or greater than the mean OBP of the lost players
+
+Only use the 2001 season data
+
+```{r}
+total_ab <- sum(lost_players$ab)
+mean_obp <- sum(lost_players$obp)
+total_sal <- 15000000
+
+season01 <- batting %>%
+  filter(year_id == 2001, !player_id %in% c("damonjo01", "giambja01", "saenzol01")) %>% #remove lost players and filter season
+  drop_na() %>%
+  select(year_id, player_id, salary, ab, obp)
+
+```
 
 
+
+###Let's solve using linear programming
+```{r}
+
+#prepare matrix for problem
+mat <- matrix(0, nrow = 3, ncol = nrow(season01))
+mat[1, ] <- 1 #any player can be one of the three
+mat[2, ] <- season01$ab # number of ab's
+mat[3, ] <- season01$salary # player salary
+
+#Input for lp solver
+objective.in <- season01$obp
+const.mat <- mat
+const.dir <- c("==", ">=", "<=")
+const.rhs <- c(3, total_ab, total_sal)
+
+sol <- lp(direction = "max", objective.in,  #maximize objective function
+          const.mat, const.dir, const.rhs, #contraints
+          all.bin = TRUE) #binary variables only
+
+#View solution
+players <- which(sol$solution == 1)
+sum(season01$salary[players])
+sum(season01$ab[players])
+sum(season01$obp[players])
+
+season01[players,] #optimal solution
+```
 
